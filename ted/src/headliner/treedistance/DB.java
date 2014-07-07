@@ -61,7 +61,7 @@ public class DB {
 		List<String> rdfs = new ArrayList<String>();
 		try
 		{
-			sqlCommand = "SELECT distinct content_name FROM guanjie.ent_content";
+			sqlCommand = "SELECT distinct content_name FROM ent_content";
 			ps = labstudyConn.prepareStatement(sqlCommand);
 			rs = ps.executeQuery();
 			while (rs.next())
@@ -363,7 +363,7 @@ public class DB {
 
 		try
 		{				
-			String sqlCommand = "SELECT `log(tf+1)idf` FROM webex21.temp2_ent_jcontent_tfidf where title = '"+q+"' and concept = '"+c+"';";
+			String sqlCommand = "SELECT `log(tf+1)idf` FROM temp2_ent_jcontent_tfidf where title = '"+q+"' and concept = '"+c+"';";
 			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
 			ResultSet rs = ps.executeQuery();
 			while (rs.next())
@@ -402,7 +402,7 @@ public class DB {
 		double weight = 0.0;
 		try
 		{				
-			String sqlCommand = "SELECT `log(tf+1)idf` FROM webex21.temp2_ent_jcontent_tfidf where title = '"+content+"' and concept in ("+concepts+");";
+			String sqlCommand = "SELECT `log(tf+1)idf` FROM temp2_ent_jcontent_tfidf where title = '"+content+"' and concept in ("+concepts+");";
 			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
 			ResultSet rs = ps.executeQuery();
 			while (rs.next())
@@ -423,9 +423,9 @@ public class DB {
 		disconnectFromLabstudy();
 	}
 
-	public HashMap<String, Double> getConceptsVector(String question) {
+	public HashMap<String, Double> getConceptsVector(String content) {
 		HashMap<String,Double> map = new HashMap<String,Double>();
-		List<String> list = getAllConcepts(question);
+		List<String> list = getAllConcepts(content);
 		String concepts = ""; 
 		for (int i = 0; i < list.size(); i++)
 		{
@@ -435,7 +435,7 @@ public class DB {
 		}
 		try
 		{				
-			String sqlCommand = "SELECT concept,`log(tf+1)idf` FROM webex21.temp2_ent_jcontent_tfidf where title = '"+question+"' and concept in ("+concepts+");";
+			String sqlCommand = "SELECT concept,`log(tf+1)idf` FROM temp2_ent_jcontent_tfidf where title = '"+content+"' and concept in ("+concepts+");";
 			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
 			ResultSet rs = ps.executeQuery();
 			while (rs.next())
@@ -448,6 +448,74 @@ public class DB {
 			 e.printStackTrace();
 		}
 		return map;	
+	}
+	
+	public double getMaxDist() {
+		double max = Double.NEGATIVE_INFINITY;
+		try
+		{				
+			String sqlCommand = "SELECT max(distance) from rel_con_con_sim where distance != "+Double.MAX_VALUE+";";
+			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
+			ResultSet rs = ps.executeQuery();
+			while (rs.next())
+			{
+				max = rs.getDouble(1);
+			}
+			rs.close();
+			ps.close();
+		}catch (SQLException e) {
+			 e.printStackTrace();
+		}
+		return max;	
+	}
+	
+	public double getMinDist() {
+		double min = Double.POSITIVE_INFINITY;
+		try
+		{				
+			String sqlCommand = "SELECT min(distance) from rel_con_con_sim;";
+			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
+			ResultSet rs = ps.executeQuery();
+			while (rs.next())
+			{
+				min = rs.getDouble(1);
+			}
+			rs.close();
+			ps.close();
+		}catch (SQLException e) {
+			 e.printStackTrace();
+		}
+		return min;	
+	}
+
+	public void updateSim() {
+		try
+		{				
+			String sqlCommand = "update rel_con_con_sim set sim = (1-normalized_distance)";
+			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
+			ps.executeUpdate();	
+			ps.close();
+		}catch (SQLException e) {
+			 e.printStackTrace();
+		}
+		
+	}
+
+	public void normalizeDistance(double maxdistance, double mindistance) {
+		try
+		{				
+			//update distances != Double.Maxvalue
+			String sqlCommand = "update rel_con_con_sim set normalized_distance = (distance-"+mindistance+")/("+(maxdistance-mindistance)+") where distance !="+Double.MAX_VALUE+";";
+			PreparedStatement ps = labstudyConn.prepareStatement(sqlCommand);
+			ps.executeUpdate();
+			//set normalized_distance = 1 when distance = Double.Maxvalue
+			sqlCommand = "update rel_con_con_sim set normalized_distance = 1 where distance ="+Double.MAX_VALUE+";";
+			ps = labstudyConn.prepareStatement(sqlCommand);
+			ps.executeUpdate();		
+			ps.close();
+		}catch (SQLException e) {
+			 e.printStackTrace();
+		}		
 	}
 
 }

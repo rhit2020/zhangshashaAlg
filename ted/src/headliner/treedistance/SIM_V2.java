@@ -14,25 +14,48 @@ public class SIM_V2 {
 		db.connect();
 		if (db.isConnectedToLabstudy())
         {
-			//storeLDAOutputToDB(db);			
-			String[] eList = db.getExamplesName();
-			List<String> list = db.getQuestionNames();
-			String[] qList = list.toArray(new String[list.size()]);
-//			String[] qList = {"j2D_Arrays1"};			
-//			String[] eList = {"create_2d_array_v2"};
+//			String[] eList = db.getExamplesName();
+//			List<String> list = db.getQuestionNames();
+//			String[] qList = list.toArray(new String[list.size()]);
+			
+			// **** for test ****//
+			String[] qList = {"j2D_Arrays4"};			
+			String[] eList = {"nested_loops_v2","while_v2"};
 			//String[] eList = {"poly_v2","inheritance_casting_1","inheritance_polymorphism_1",
 			//		"inheritance_polymorphism_2","inheritance_constructors_1","simple_inheritance_1"};
-			for (String q : qList)
-			{
-				for (String e : eList) {
-					calStructuralContentSim(db, q, e);
-					//calConceptSimilarity(db,q,e);
-					//calLDASimilarity(db,q,e);
-				}
-			}
+			// **** for test ****//
+			
+			calculateStructuralSim(db, qList, eList);
+			//calculateConceptSim(db, qList, eList);
+			
 			db.disconnect();
 		}
 
+	}
+
+	private static void calculateConceptSim(DB db, String[] qList, String[] eList) {
+		for (String q : qList)
+		{
+			for (String e : eList) {
+				calConceptSimilarity(db,q,e);
+			}
+		}
+		
+	}
+
+	private static void calculateStructuralSim(DB db, String[] qList, String[] eList) {
+		for (String q : qList)
+		{
+			for (String e : eList) {
+				calStructuralContentSim(db, q, e);
+			}
+		}
+		//normalize the distance
+//		double maxdistance = db.getMaxDist();
+//		double mindistance = db.getMinDist();
+//		db.normalizeDistance(maxdistance,mindistance);
+		//update the sim (current function is : 1-x)
+//		db.updateSim();		
 	}
 
 	private static void calConceptSimilarity(DB db, String q, String e) {
@@ -96,8 +119,8 @@ public class SIM_V2 {
 		double size_qs;
 		
 		HashMap<String,Double> q_vector = db.getConceptsVector(q); //keys are concept and values are tf-idf value for concepts
-		
         List<String> es_concepts;
+        HashMap<String,Double> es_concept_weights = db.getConceptsVector(e);
 		//find distance of q to e
 		for (String qs : qsubList)
 		{
@@ -109,13 +132,17 @@ public class SIM_V2 {
 				size_es = getConceptsInSubtree(es).size();
 				//calculate size ratio
 				temp = temp * Math.pow((size_qs/sizeQ)*(size_es/sizeE), -1);
-				//calculate cos(qs,es)
+				//calculate cos(qs,es) for the common concept in both example and question, we should create weights as follows:
+				// for example_concepts: the weight is the log(tf+1)idf of the concept in example,
+				//for question_concepts: the weight is the log(tf+1)idf of the concept in question,
+				//the reason for this is that if for instance ++ is an important concept in Q, it should be also an important concept in E to make the example a good candidate
+				//if the weight of the concept is not high in example, it means example is not descriptive for this concept fully. 
 				es_concepts = getConceptsInSubtree(es);
 				HashMap<String,Double> es_vector = new HashMap<String,Double>();
 				for (String con : q_vector.keySet())
 				{
 					if (es_concepts.contains(con))
-						es_vector.put(con, q_vector.get(con));
+						es_vector.put(con, es_concept_weights.get(con));// here is where we get the tf-idf value for the example concept
 					else
 						es_vector.put(con,0.0);
 				}
@@ -151,15 +178,29 @@ public class SIM_V2 {
 //			System.out.println("mincost: "+mincost);
 //			System.out.println("******************");
 		}
-
+		
 		for (Map.Entry<String, Double> entry : q2edistMap.entrySet())
 		{
 			dist += entry.getValue();
 		}
 		if (dist == Double.POSITIVE_INFINITY)
 			dist = Double.MAX_VALUE;//just for storing in db
-		sim = 1.0/(Math.exp(0.01*dist));
-		db.insertContentSim(q, e,sim,dist,"CSSIM");
+		//sim = 1.0/(Math.exp(0.01*dist));
+		
+		System.out.println("Question:"+q+", Subtree#:"+q2edistMap.size());
+		System.out.println("*****"+e+"*****");
+		for (Map.Entry<String, Double> entry : q2edistMap.entrySet())
+		{
+			System.out.println(entry.getKey()+":"+entry.getValue());
+			System.out.println();
+			System.out.println();
+
+		} 
+		System.out.println("dist:"+dist);
+		System.out.println("**********");
+		
+		
+		db.insertContentSim(q, e,-1,dist,"CSSIM");
 	}
 
 
